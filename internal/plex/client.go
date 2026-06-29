@@ -30,7 +30,7 @@ type Section struct {
 	Type  string `json:"type"`
 }
 
-// Item is a single piece of media recently added to a section.
+// Item is a single piece of media in a section (movie or episode).
 type Item struct {
 	RatingKey        string
 	Title            string
@@ -42,6 +42,8 @@ type Item struct {
 	GUID             string
 	ParentTitle      string
 	GrandparentTitle string
+	ParentIndex      int // season number (episodes)
+	Index            int // episode number (episodes)
 }
 
 // NewClient builds a Plex client. baseURL is e.g. http://plex:32400.
@@ -121,45 +123,73 @@ type rawItem struct {
 	GUID             string `json:"guid"`
 	ParentTitle      string `json:"parentTitle"`
 	GrandparentTitle string `json:"grandparentTitle"`
+	ParentIndex      int    `json:"parentIndex"`
+	Index            int    `json:"index"`
 }
 
 type metadataResponse struct {
 	MediaContainer struct {
-		Metadata []rawItem `json:"Metadata"`
+		Size      int       `json:"size"`
+		TotalSize int       `json:"totalSize"`
+		Metadata  []rawItem `json:"Metadata"`
 	} `json:"MediaContainer"`
 }
 
-// RecentlyAdded returns the most recently added items of a section, newest first,
-// capped at limit.
-func (c *Client) RecentlyAdded(ctx context.Context, sectionKey string, limit int) ([]Item, error) {
-	q := url.Values{}
-	if limit > 0 {
-		q.Set("X-Plex-Container-Start", "0")
-		q.Set("X-Plex-Container-Size", strconv.Itoa(limit))
-	}
+// allPageSize is the number of items fetched per Plex request when paginating
+// through an entire library.
+const allPageSize = 200
 
-	var r metadataResponse
-	path := "/library/sections/" + url.PathEscape(sectionKey) + "/recentlyAdded"
-	if err := c.get(ctx, path, q, &r); err != nil {
-		return nil, err
-	}
+// AllItems fetches every item of a section, newest first (sorted by addedAt).
+// For show sections, pass episodes=true to retrieve episodes (Plex type 4)
+// rather than series.
+func (c *Client) AllItems(ctx context.Context, sectionKey string, episodes bool) ([]Item, error) {
+	path := "/library/sections/" + url.PathEscape(sectionKey) + "/all"
 
-	items := make([]Item, 0, len(r.MediaContainer.Metadata))
-	for _, m := range r.MediaContainer.Metadata {
-		items = append(items, Item{
-			RatingKey:        m.RatingKey,
-			Title:            m.Title,
-			Summary:          m.Summary,
-			Type:             m.Type,
-			Year:             m.Year,
-			Thumb:            m.Thumb,
-			AddedAt:          m.AddedAt,
-			GUID:             m.GUID,
-			ParentTitle:      m.ParentTitle,
-			GrandparentTitle: m.GrandparentTitle,
-		})
+	var items []Item
+	for start := 0; ; start += allPageSize {
+		q := url.Values{}
+		q.Set("sort", "addedAt:desc")
+		q.Set("X-Plex-Container-Start", strconv.Itoa(start))
+		q.Set("X-Plex-Container-Size", strconv.Itoa(allPageSize))
+		if episodes {
+			q.Set("type", "4")
+		}
+
+		var r metadataResponse
+		if err := c.get(ctx, path, q, &r); err != nil {
+			return nil, err
+		}
+
+		for _, m := range r.MediaContainer.Metadata {
+			items = append(items, toItem(m))
+		}
+
+		// Stop once we've fetched a short (final) page, or reached totalSize.
+		if len(r.MediaContainer.Metadata) < allPageSize {
+			break
+		}
+		if total := r.MediaContainer.TotalSize; total > 0 && start+allPageSize >= total {
+			break
+		}
 	}
 	return items, nil
+}
+
+func toItem(m rawItem) Item {
+	return Item{
+		RatingKey:        m.RatingKey,
+		Title:            m.Title,
+		Summary:          m.Summary,
+		Type:             m.Type,
+		Year:             m.Year,
+		Thumb:            m.Thumb,
+		AddedAt:          m.AddedAt,
+		GUID:             m.GUID,
+		ParentTitle:      m.ParentTitle,
+		GrandparentTitle: m.GrandparentTitle,
+		ParentIndex:      m.ParentIndex,
+		Index:            m.Index,
+	}
 }
 
 type identityResponse struct {

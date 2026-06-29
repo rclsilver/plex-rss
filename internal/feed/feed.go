@@ -121,12 +121,16 @@ func feedTitle(section string) string {
 	return fmt.Sprintf("Plex — %s", section)
 }
 
-// itemTitle builds a human-friendly title, prefixing episodes with their show
-// (and season when available via parentTitle).
+// itemTitle builds a human-friendly title:
+//   - movies:   "Title (Year)"
+//   - episodes: "Show — S01E02 — Title"
 func itemTitle(it plex.Item) string {
 	parts := []string{}
 	if it.GrandparentTitle != "" {
 		parts = append(parts, it.GrandparentTitle)
+	}
+	if it.Type == "episode" && it.ParentIndex > 0 && it.Index > 0 {
+		parts = append(parts, fmt.Sprintf("S%02dE%02d", it.ParentIndex, it.Index))
 	}
 	title := it.Title
 	if it.Type == "movie" && it.Year > 0 {

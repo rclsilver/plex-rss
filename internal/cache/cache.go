@@ -33,7 +33,6 @@ type Clock func() time.Time
 type Cache struct {
 	dir       string
 	plex      *plex.Client
-	limit     int
 	publicURL string
 	feedToken string
 	now       Clock
@@ -51,7 +50,7 @@ type Cache struct {
 // New creates a Cache and ensures the cache directory exists. allowSections is
 // the publish allowlist (titles or keys, case-insensitive); empty publishes all
 // libraries.
-func New(dir string, p *plex.Client, limit int, publicURL, feedToken string, allowSections []string, now Clock) (*Cache, error) {
+func New(dir string, p *plex.Client, publicURL, feedToken string, allowSections []string, now Clock) (*Cache, error) {
 	if now == nil {
 		now = time.Now
 	}
@@ -65,7 +64,6 @@ func New(dir string, p *plex.Client, limit int, publicURL, feedToken string, all
 	return &Cache{
 		dir:       dir,
 		plex:      p,
-		limit:     limit,
 		publicURL: publicURL,
 		feedToken: feedToken,
 		allow:     allow,
@@ -188,7 +186,9 @@ func (c *Cache) Refresh(ctx context.Context, sectionKey string) error {
 		return err
 	}
 
-	items, err := c.plex.RecentlyAdded(ctx, sectionKey, c.limit)
+	// Show sections are published at the episode level; everything else (movies)
+	// at the item level.
+	items, err := c.plex.AllItems(ctx, sectionKey, section.Type == "show")
 	if err != nil {
 		return err
 	}

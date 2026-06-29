@@ -14,14 +14,14 @@ import (
 )
 
 const sectionsJSON = `{"MediaContainer":{"Directory":[{"key":"1","title":"Films","type":"movie"}]}}`
-const recentJSON = `{"MediaContainer":{"Metadata":[{"ratingKey":"101","type":"movie","title":"Dune","year":2021,"addedAt":1700000000}]}}`
+const allJSON = `{"MediaContainer":{"size":1,"totalSize":1,"Metadata":[{"ratingKey":"101","type":"movie","title":"Dune","year":2021,"addedAt":1700000000}]}}`
 const identityJSON = `{"MediaContainer":{"machineIdentifier":"machine-xyz"}}`
 
 func fakePlex(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/library/sections", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(sectionsJSON)) })
-	mux.HandleFunc("/library/sections/1/recentlyAdded", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(recentJSON)) })
+	mux.HandleFunc("/library/sections/1/all", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(allJSON)) })
 	mux.HandleFunc("/identity", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(identityJSON)) })
 	return httptest.NewServer(mux)
 }
@@ -32,7 +32,7 @@ func newServer(t *testing.T) (*Server, *cache.Cache) {
 	t.Cleanup(ts.Close)
 
 	pc := plex.NewClient(ts.URL, "plextok", false)
-	c, err := cache.New(t.TempDir(), pc, 25, "https://plex-rss.example.com", "feedtok", nil, func() time.Time { return time.Unix(1700001000, 0).UTC() })
+	c, err := cache.New(t.TempDir(), pc, "https://plex-rss.example.com", "feedtok", nil, func() time.Time { return time.Unix(1700001000, 0).UTC() })
 	if err != nil {
 		t.Fatalf("cache.New: %v", err)
 	}
@@ -128,19 +128,19 @@ func TestAllowlistRestrictsSections(t *testing.T) {
 	mux.HandleFunc("/library/sections", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"MediaContainer":{"Directory":[{"key":"1","title":"Films","type":"movie"},{"key":"2","title":"Séries","type":"show"}]}}`))
 	})
-	mux.HandleFunc("/library/sections/2/recentlyAdded", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"MediaContainer":{"Metadata":[{"ratingKey":"7","type":"episode","title":"Pilot","grandparentTitle":"Show","addedAt":1700000000}]}}`))
+	mux.HandleFunc("/library/sections/2/all", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"MediaContainer":{"size":1,"totalSize":1,"Metadata":[{"ratingKey":"7","type":"episode","title":"Pilot","grandparentTitle":"Show","parentIndex":1,"index":1,"addedAt":1700000000}]}}`))
 	})
 	mux.HandleFunc("/identity", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(identityJSON)) })
-	mux.HandleFunc("/library/sections/1/recentlyAdded", func(w http.ResponseWriter, _ *http.Request) {
-		t.Error("recentlyAdded must not be called for a non-allowed section")
+	mux.HandleFunc("/library/sections/1/all", func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("section content must not be fetched for a non-allowed section")
 	})
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
 	pc := plex.NewClient(ts.URL, "plextok", false)
 	// Allow only "Séries" (by title).
-	c, err := cache.New(t.TempDir(), pc, 25, "https://x", "feedtok", []string{"Séries"}, func() time.Time { return time.Unix(1, 0) })
+	c, err := cache.New(t.TempDir(), pc, "https://x", "feedtok", []string{"Séries"}, func() time.Time { return time.Unix(1, 0) })
 	if err != nil {
 		t.Fatalf("cache.New: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestThumbProxy(t *testing.T) {
 	defer ts.Close()
 
 	pc := plex.NewClient(ts.URL, "plextok", false)
-	c, _ := cache.New(t.TempDir(), pc, 25, "", "feedtok", nil, nil)
+	c, _ := cache.New(t.TempDir(), pc, "", "feedtok", nil, nil)
 	s := New(c, pc, "feedtok", "")
 
 	rec := do(t, s.PublicHandler(), http.MethodGet, "/thumb?token=feedtok&path=/library/metadata/101/thumb/1")

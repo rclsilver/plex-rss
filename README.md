@@ -1,7 +1,9 @@
 # plex-rss
 
 Génère des flux **RSS** à partir du contenu d'une médiathèque **Plex** : un flux
-par bibliothèque (Films, Séries, Musique…), listant les **ajouts récents**.
+par bibliothèque (Films, Séries…), listant **tout le contenu** de la bibliothèque
+(catalogue complet), trié par date d'ajout décroissante. Les bibliothèques de
+séries sont publiées **au niveau épisode**.
 
 ## Pourquoi un cache ?
 
@@ -53,7 +55,6 @@ l'Ingress : il repose sur l'isolation réseau intra-cluster.
 | `FEED_TOKEN` | ✅ | — | Token attendu dans `?token=` pour servir un flux. |
 | `SECTIONS` | | _(toutes)_ | Allowlist des bibliothèques à publier, séparées par des virgules, par **titre exact ou clé** (insensible à la casse). Ex. `Films,Séries`. Vide = toutes. |
 | `PUBLIC_URL` | | — | Base d'URL publique (liens `self`, URLs de vignettes). |
-| `DEFAULT_LIMIT` | | `25` | Nombre d'items par flux. |
 | `CACHE_DIR` | | `/cache` | Répertoire des fichiers RSS pré-générés. |
 | `REFRESH_INTERVAL` | | `6h` | TTL de rafraîchissement de secours. |
 | `SERVER_PORT` | | `8080` | Port du serveur public. |

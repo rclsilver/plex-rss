@@ -16,9 +16,8 @@ type Config struct {
 	PlexInsecure bool
 
 	// Feed serving
-	FeedToken    string
-	PublicURL    string
-	DefaultLimit int
+	FeedToken string
+	PublicURL string
 
 	// Sections is the allowlist of libraries to publish, matched by exact title
 	// or key (case-insensitive). Empty means publish every library.
@@ -44,7 +43,6 @@ func LoadConfig() (*Config, error) {
 		RefreshInterval: 6 * time.Hour,
 		ServerPort:      8080,
 		InternalPort:    8081,
-		DefaultLimit:    25,
 	}
 
 	if cfg.PlexURL == "" {
@@ -69,9 +67,6 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	if err := parseInt(os.Getenv("INTERNAL_PORT"), &cfg.InternalPort, "INTERNAL_PORT"); err != nil {
-		return nil, err
-	}
-	if err := parseInt(os.Getenv("DEFAULT_LIMIT"), &cfg.DefaultLimit, "DEFAULT_LIMIT"); err != nil {
 		return nil, err
 	}
 

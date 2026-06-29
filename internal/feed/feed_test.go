@@ -32,7 +32,7 @@ type parsedRSS struct {
 func sampleItems() []plex.Item {
 	return []plex.Item{
 		{RatingKey: "101", GUID: "plex://movie/abc", Type: "movie", Title: "Dune", Summary: "Sci-fi", Year: 2021, Thumb: "/library/metadata/101/thumb/1", AddedAt: 1700000000},
-		{RatingKey: "202", Type: "episode", Title: "Pilot", GrandparentTitle: "Show", AddedAt: 1700000100},
+		{RatingKey: "202", Type: "episode", Title: "Pilot", GrandparentTitle: "Show", ParentIndex: 1, Index: 2, AddedAt: 1700000100},
 	}
 }
 
@@ -89,9 +89,9 @@ func TestBuildBasic(t *testing.T) {
 		t.Errorf("expected thumbnail proxy enclosure, got %q", first.Enclosure.URL)
 	}
 
-	// Episode title is prefixed with its show.
-	if parsed.Channel.Items[1].Title != "Show — Pilot" {
-		t.Errorf("expected episode title 'Show — Pilot', got %q", parsed.Channel.Items[1].Title)
+	// Episode title is prefixed with its show and SxxExx code.
+	if parsed.Channel.Items[1].Title != "Show — S01E02 — Pilot" {
+		t.Errorf("expected episode title 'Show — S01E02 — Pilot', got %q", parsed.Channel.Items[1].Title)
 	}
 }
 

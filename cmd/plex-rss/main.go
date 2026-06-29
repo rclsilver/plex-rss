@@ -31,7 +31,6 @@ func main() {
 	log.Printf("  Refresh interval: %s", cfg.RefreshInterval)
 	log.Printf("  Public port:      %d", cfg.ServerPort)
 	log.Printf("  Internal port:    %d", cfg.InternalPort)
-	log.Printf("  Default limit:    %d", cfg.DefaultLimit)
 	if len(cfg.Sections) == 0 {
 		log.Printf("  Sections:         <all>")
 	} else {
@@ -40,7 +39,7 @@ func main() {
 
 	plexClient := plex.NewClient(cfg.PlexURL, cfg.PlexToken, cfg.PlexInsecure)
 
-	c, err := cache.New(cfg.CacheDir, plexClient, cfg.DefaultLimit, cfg.PublicURL, cfg.FeedToken, cfg.Sections, time.Now)
+	c, err := cache.New(cfg.CacheDir, plexClient, cfg.PublicURL, cfg.FeedToken, cfg.Sections, time.Now)
 	if err != nil {
 		log.Fatalf("Failed to initialize cache: %v", err)
 	}
