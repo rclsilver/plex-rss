@@ -1,0 +1,5 @@
+/.env
+/plex-rss
+/cache
+*.db
+*.log
