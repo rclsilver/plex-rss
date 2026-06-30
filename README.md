@@ -1,99 +1,96 @@
 # plex-rss
 
-Génère des flux **RSS** à partir du contenu d'une médiathèque **Plex** : un flux
-par bibliothèque (Films, Séries…), listant **tout le contenu** de la bibliothèque
-(catalogue complet), trié par date d'ajout décroissante. Les bibliothèques de
-séries sont publiées **au niveau épisode**.
+Generates **RSS** feeds from the content of a **Plex** media library: one feed per
+library (Movies, TV Shows…), listing the **entire library** (full catalog), sorted
+by date added (newest first). TV libraries are published **at the episode level**.
 
-## Pourquoi un cache ?
+## Why a cache?
 
-Les lecteurs RSS interrogent un flux très fréquemment. Pour **ne pas surcharger
-le serveur Plex**, `plex-rss` ne contacte jamais Plex au moment d'une lecture :
-il sert un fichier RSS **pré-généré** (un par bibliothèque, dans `CACHE_DIR`).
+RSS readers poll feeds very frequently. To **avoid overloading the Plex server**,
+`plex-rss` never contacts Plex when a feed is read: it serves a **pre-generated**
+RSS file (one per library, in `CACHE_DIR`).
 
-La (re)génération depuis Plex n'est déclenchée que par :
+Regeneration from Plex is only triggered by:
 
-1. **un warm au démarrage** — toutes les bibliothèques sont générées au boot ;
-2. **un TTL de secours** — rafraîchissement périodique (`REFRESH_INTERVAL`, 6 h
-   par défaut) au cas où un événement serait manqué ;
-3. **une route interne de refresh** — `POST /refresh/{sectionKey}`, appelée par
-   **Sonarr/Radarr** lors d'un import (connexion « Webhook »).
+1. **a warm-up at startup** — all libraries are generated at boot;
+2. **a fallback TTL** — periodic refresh (`REFRESH_INTERVAL`, 6h by default) in
+   case an event was missed;
+3. **an internal refresh route** — `POST /refresh/{sectionKey}`, called by
+   **Sonarr/Radarr** on import (via a "Webhook" connection).
 
-Le cache est éphémère (reconstruit au démarrage) ; aucun stockage persistant
-n'est requis.
+The cache is ephemeral (rebuilt at startup); no persistent storage is required.
 
 ## Endpoints
 
-### Serveur public (`SERVER_PORT`, défaut `8080`) — exposé publiquement
+### Public server (`SERVER_PORT`, default `8080`) — publicly exposed
 
-Toutes les routes (sauf `/healthz`) exigent le token de flux via `?token=…`.
+All routes (except `/healthz`) require the feed token via `?token=…`.
 
-| Méthode | Route | Description |
+| Method | Route | Description |
 |---|---|---|
-| GET | `/healthz` | Health check (sans token). |
-| GET | `/feeds?token=…` | Index JSON des bibliothèques et de leurs URLs de flux. |
-| GET | `/feed/{sectionKey}?token=…` | Flux RSS d'une bibliothèque (servi depuis le cache ; `503` tant que le cache est froid). |
-| GET | `/thumb?token=…&path=…` | Proxy de vignette (évite d'exposer le token Plex dans le flux). |
+| GET | `/healthz` | Health check (no token). |
+| GET | `/feeds?token=…` | JSON index of the libraries and their feed URLs. |
+| GET | `/feed/{sectionKey}?token=…` | RSS feed of a library (served from the cache; `503` while the cache is cold). |
+| GET | `/thumb?token=…&path=…` | Thumbnail proxy (avoids exposing the Plex token in the feed). |
 
-### Serveur interne (`INTERNAL_PORT`, défaut `8081`) — **ClusterIP uniquement**
+### Internal server (`INTERNAL_PORT`, default `8081`) — **ClusterIP only**
 
-| Méthode | Route | Description |
+| Method | Route | Description |
 |---|---|---|
-| POST | `/refresh/{sectionKey}` | Régénère le flux d'une bibliothèque depuis Plex. |
-| POST | `/refresh/all` | Régénère toutes les bibliothèques. |
+| POST | `/refresh/{sectionKey}` | Regenerates a library's feed from Plex. |
+| POST | `/refresh/all` | Regenerates all libraries. |
 
-Ce serveur n'a **pas d'authentification** et ne doit jamais être exposé via
-l'Ingress : il repose sur l'isolation réseau intra-cluster.
+This server has **no authentication** and must never be exposed through the
+Ingress: it relies on in-cluster network isolation.
 
-## Configuration (variables d'environnement)
+## Configuration (environment variables)
 
-| Variable | Requis | Défaut | Description |
+| Variable | Required | Default | Description |
 |---|---|---|---|
-| `PLEX_URL` | ✅ | — | URL du serveur Plex (ex. `http://plex:32400`). |
-| `PLEX_TOKEN` | ✅ | — | Token d'API Plex (`X-Plex-Token`). |
-| `PLEX_INSECURE` | | `false` | Ignore la vérification TLS (si `PLEX_URL` en https). |
-| `FEED_TOKEN` | ✅ | — | Token attendu dans `?token=` pour servir un flux. |
-| `SECTIONS` | | _(toutes)_ | Allowlist des bibliothèques à publier, séparées par des virgules, par **titre exact ou clé** (insensible à la casse). Ex. `Films,Séries`. Vide = toutes. |
-| `PUBLIC_URL` | | — | Base d'URL publique (liens `self`, URLs de vignettes). |
-| `CACHE_DIR` | | `/cache` | Répertoire des fichiers RSS pré-générés. |
-| `REFRESH_INTERVAL` | | `6h` | TTL de rafraîchissement de secours. |
-| `SERVER_PORT` | | `8080` | Port du serveur public. |
-| `INTERNAL_PORT` | | `8081` | Port du serveur interne. |
+| `PLEX_URL` | ✅ | — | Plex server URL (e.g. `http://plex:32400`). |
+| `PLEX_TOKEN` | ✅ | — | Plex API token (`X-Plex-Token`). |
+| `PLEX_INSECURE` | | `false` | Skip TLS verification (if `PLEX_URL` is https). |
+| `FEED_TOKEN` | ✅ | — | Token expected in `?token=` to serve a feed. |
+| `SECTIONS` | | _(all)_ | Allowlist of libraries to publish, comma-separated, by **exact title or key** (case-insensitive). E.g. `Movies,TV Shows`. Empty = all. |
+| `PUBLIC_URL` | | — | Public base URL (`self` links, thumbnail URLs). |
+| `CACHE_DIR` | | `/cache` | Directory of the pre-generated RSS files. |
+| `REFRESH_INTERVAL` | | `6h` | Fallback refresh TTL. |
+| `SERVER_PORT` | | `8080` | Public server port. |
+| `INTERNAL_PORT` | | `8081` | Internal server port. |
 
-## Développement
+## Development
 
 ```sh
-make build      # compile le binaire ./plex-rss
-make test       # tests unitaires
+make build      # build the ./plex-rss binary
+make test       # unit tests
 make vet        # go vet
 make run        # build + run
 ```
 
-Exécution locale :
+Run locally:
 
 ```sh
 export PLEX_URL=http://localhost:32400
 export PLEX_TOKEN=…           # X-Plex-Token
 export FEED_TOKEN=test
 ./plex-rss
-# puis :
+# then:
 curl localhost:8080/healthz
 curl 'localhost:8080/feeds?token=test'
 curl -X POST localhost:8081/refresh/all
 curl 'localhost:8080/feed/1?token=test'
 ```
 
-## Configuration Sonarr / Radarr
+## Sonarr / Radarr configuration
 
-Dans **Settings → Connect → Webhook**, déclencheurs « On Import » (+ « On
-Upgrade »), URL :
+In **Settings → Connect → Webhook**, triggers "On Import" (+ "On Upgrade"), URL:
 
 ```
 http://plex-rss.mediacenter.svc.cluster.local:8081/refresh/<sectionKey>
 ```
 
-(Sonarr → section Séries, Radarr → section Films ; les `sectionKey` se lisent via
-`GET /feeds`.)
+(Sonarr → TV Shows section, Radarr → Movies section; the `sectionKey` values can be
+read from `GET /feeds`.)
 
 ## Docker
 
@@ -105,4 +102,4 @@ docker run --rm -p 8080:8080 -p 8081:8081 \
   plex-rss
 ```
 
-L'image publiée est `ghcr.io/rclsilver/plex-rss`.
+The published image is `ghcr.io/rclsilver/plex-rss`.
